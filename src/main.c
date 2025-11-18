@@ -78,29 +78,29 @@ Vector3 Vector3Normalize(Vector3 v) {
 
 Vector3 Vector3Negate(Vector3 v) { return (Vector3){-v.x, -v.y, -v.z}; }
 
-void draw_pixel(u8 image_buffer[BUFFER_SIZE], float x, float y) {
-  int _x = CHANNELS * x;
-  int _y = (int)roundf(y);
-  image_buffer[_y * (IMAGE_WIDTH * CHANNELS) + _x] = 0;
-  image_buffer[_y * (IMAGE_WIDTH * CHANNELS) + _x + 1] = 0;
-  image_buffer[_y * (IMAGE_WIDTH * CHANNELS) + _x + 2] = 0;
+void draw_pixel(u8 image_buffer[BUFFER_SIZE], float rx, float ry) {
+  int x = (int)(IMAGE_WIDTH / 2) + rx;
+  int y = (int)(IMAGE_HEIGHT / 2) + ry;
+  int index = y * (IMAGE_WIDTH * CHANNELS) + (x * CHANNELS);
+  printf("(%i, %i) %i\n", x, y, index);
+  image_buffer[index] = 0;
+  image_buffer[index + 1] = 0;
+  image_buffer[index + 2] = 0;
 }
 
-void interpolate(u16 buffer[1000], int buffer_count, float i0, float d0,
-                 float i1, float d1) {
+void interpolate(float buffer[1000], float i0, float d0, float i1, float d1) {
   float a = (d1 - d0) / (i1 - i0);
   float d = d0;
+  int count = 0;
 
   for (int i = i0; i <= i1; i++) {
-    buffer[buffer_count] = d;
-    buffer_count++;
-    assert(buffer_count < 1000);
+    buffer[count++] = d;
     d += a;
   }
 }
 
 void draw_line(u8 image_buffer[BUFFER_SIZE], Vector3 P0, Vector3 P1) {
-  u16 buffer[1000];
+  float buffer[1000];
   int buffer_count = 0;
 
   if (fabsf(P1.x - P0.x) > fabsf(P1.y - P0.y)) {
@@ -109,9 +109,9 @@ void draw_line(u8 image_buffer[BUFFER_SIZE], Vector3 P0, Vector3 P1) {
       P0 = P1;
       P1 = tmp;
     }
-    interpolate(buffer, buffer_count, P0.x, P0.y, P1.x, P1.y);
+    interpolate(buffer, P0.x, P0.y, P1.x, P1.y);
     for (int x = P0.x; x <= P1.x; x++) {
-      int y = round(x - P0.x);
+      int y = x - P0.x;
       draw_pixel(image_buffer, x, buffer[y]);
     }
   } else {
@@ -120,13 +120,19 @@ void draw_line(u8 image_buffer[BUFFER_SIZE], Vector3 P0, Vector3 P1) {
       P0 = P1;
       P1 = tmp;
     }
-    interpolate(buffer, buffer_count, P0.y, P0.x, P1.y, P1.x);
+    interpolate(buffer, P0.y, P0.x, P1.y, P1.x);
     for (int y = P0.y; y <= P1.y; y++) {
-      int x = roundf(x - P0.x);
-      printf("%i\n", x);
-      draw_pixel(image_buffer, x, y);
+      int x = y - P0.y;
+      draw_pixel(image_buffer, buffer[x], y);
     }
   }
+}
+
+void draw_wireframe_triangle(u8 image_buffer[BUFFER_SIZE], Vector3 P0,
+                             Vector3 P1, Vector3 P2) {
+  draw_line(image_buffer, P0, P1);
+  draw_line(image_buffer, P1, P2);
+  draw_line(image_buffer, P2, P0);
 }
 
 int main(void) {
@@ -139,24 +145,11 @@ int main(void) {
   u8 image_buffer[BUFFER_SIZE] = {0};
   memset(image_buffer, 255, BUFFER_SIZE);
 
-  Vector3 P0 = {-50, -200, 0};
-  Vector3 P1 = {60, 240, 0};
+  Vector3 P0 = {-200, -250, 0};
+  Vector3 P1 = {200, 50, 0};
+  Vector3 P2 = {20, 250, 0};
 
-  // float a = (P1.y - P0.y) / (P1.x - P0.x);
-  // float y = P0.y;
-  // // int b = P0.y - a * P0.x;
-  // // int y = a * x + b;
-  //
-  // for (int x = P0.x; x <= P1.x; x++) {
-  //   int _x = CHANNELS * x;
-  //   int _y = (int)roundf(y);
-  //   image_buffer[_y * (IMAGE_WIDTH * CHANNELS) + _x] = 0;
-  //   image_buffer[_y * (IMAGE_WIDTH * CHANNELS) + _x + 1] = 0;
-  //   image_buffer[_y * (IMAGE_WIDTH * CHANNELS) + _x + 2] = 0;
-  //   y += a;
-  // }
-
-  draw_line(image_buffer, P0, P1);
+  draw_wireframe_triangle(image_buffer, P0, P1, P2);
 
   fprintf(file, "P3\n%i %i\n 255\n", IMAGE_WIDTH, IMAGE_HEIGHT);
   for (int i = 0; i < BUFFER_SIZE; i += 3) {
