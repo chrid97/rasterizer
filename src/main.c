@@ -5,8 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#define IMAGE_HEIGHT 500
-#define IMAGE_WIDTH 500
+#define IMAGE_HEIGHT 1000
+#define IMAGE_WIDTH 1000
 #define CHANNELS 3
 #define BUFFER_SIZE IMAGE_WIDTH * IMAGE_HEIGHT * CHANNELS
 
@@ -78,14 +78,14 @@ Vector3 Vector3Normalize(Vector3 v) {
 
 Vector3 Vector3Negate(Vector3 v) { return (Vector3){-v.x, -v.y, -v.z}; }
 
-void draw_pixel(u8 image_buffer[BUFFER_SIZE], float rx, float ry) {
+void draw_pixel(u8 image_buffer[BUFFER_SIZE], float rx, float ry,
+                Vector3 color) {
   int x = (int)(IMAGE_WIDTH / 2) + rx;
-  int y = (int)(IMAGE_HEIGHT / 2) + ry;
+  int y = (int)(IMAGE_HEIGHT / 2) - ry;
   int index = y * (IMAGE_WIDTH * CHANNELS) + (x * CHANNELS);
-  printf("(%i, %i) %i\n", x, y, index);
-  image_buffer[index] = 0;
-  image_buffer[index + 1] = 0;
-  image_buffer[index + 2] = 0;
+  image_buffer[index] = color.x;
+  image_buffer[index + 1] = color.y;
+  image_buffer[index + 2] = color.z;
 }
 
 void interpolate(float buffer[1000], float i0, float d0, float i1, float d1) {
@@ -99,7 +99,8 @@ void interpolate(float buffer[1000], float i0, float d0, float i1, float d1) {
   }
 }
 
-void draw_line(u8 image_buffer[BUFFER_SIZE], Vector3 P0, Vector3 P1) {
+void draw_line(u8 image_buffer[BUFFER_SIZE], Vector3 P0, Vector3 P1,
+               Vector3 color) {
   float buffer[1000];
   int buffer_count = 0;
 
@@ -112,7 +113,7 @@ void draw_line(u8 image_buffer[BUFFER_SIZE], Vector3 P0, Vector3 P1) {
     interpolate(buffer, P0.x, P0.y, P1.x, P1.y);
     for (int x = P0.x; x <= P1.x; x++) {
       int y = x - P0.x;
-      draw_pixel(image_buffer, x, buffer[y]);
+      draw_pixel(image_buffer, x, buffer[y], color);
     }
   } else {
     if (P0.y > P1.y) {
@@ -123,16 +124,16 @@ void draw_line(u8 image_buffer[BUFFER_SIZE], Vector3 P0, Vector3 P1) {
     interpolate(buffer, P0.y, P0.x, P1.y, P1.x);
     for (int y = P0.y; y <= P1.y; y++) {
       int x = y - P0.y;
-      draw_pixel(image_buffer, buffer[x], y);
+      draw_pixel(image_buffer, buffer[x], y, color);
     }
   }
 }
 
 void draw_wireframe_triangle(u8 image_buffer[BUFFER_SIZE], Vector3 P0,
-                             Vector3 P1, Vector3 P2) {
-  draw_line(image_buffer, P0, P1);
-  draw_line(image_buffer, P1, P2);
-  draw_line(image_buffer, P2, P0);
+                             Vector3 P1, Vector3 P2, Vector3 color) {
+  draw_line(image_buffer, P0, P1, color);
+  draw_line(image_buffer, P1, P2, color);
+  draw_line(image_buffer, P2, P0, color);
 }
 
 int main(void) {
@@ -149,7 +150,11 @@ int main(void) {
   Vector3 P1 = {200, 50, 0};
   Vector3 P2 = {20, 250, 0};
 
-  draw_wireframe_triangle(image_buffer, P0, P1, P2);
+  Vector3 RED = {255, 0, 0};
+  Vector3 BLACK = {0, 0, 0};
+
+  draw_wireframe_triangle(image_buffer, P0, P1, P2, BLACK);
+  draw_line(image_buffer, P0, P1, RED);
 
   fprintf(file, "P3\n%i %i\n 255\n", IMAGE_WIDTH, IMAGE_HEIGHT);
   for (int i = 0; i < BUFFER_SIZE; i += 3) {
