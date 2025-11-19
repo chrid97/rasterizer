@@ -3,7 +3,12 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+#define Kilobytes(Value) ((Value) * 1024LL)
+#define Megabytes(Value) (Kilobytes(Value) * 1024LL)
+#define Gigabytes(Value) (Megabytes(Value) * 1024LL)
 
 #define IMAGE_HEIGHT 1000
 #define IMAGE_WIDTH 1000
@@ -21,6 +26,19 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
+
+typedef struct Arena Arena;
+struct Arena {
+  Arena *current;
+  u64 size;
+};
+
+Arena *arena_alloc(u64 size) {
+  Arena *arena = malloc(size);
+  arena->current = arena;
+  arena->size = size;
+  return arena;
+}
 
 typedef struct {
   float x;
@@ -78,6 +96,12 @@ Vector3 Vector3Normalize(Vector3 v) {
 
 Vector3 Vector3Negate(Vector3 v) { return (Vector3){-v.x, -v.y, -v.z}; }
 
+void swap(Vector3 *a, Vector3 *b) {
+  Vector3 tmp = *a;
+  *a = *b;
+  *b = tmp;
+}
+
 void draw_pixel(u8 image_buffer[BUFFER_SIZE], float rx, float ry,
                 Vector3 color) {
   int x = (int)(IMAGE_WIDTH / 2) + rx;
@@ -106,9 +130,7 @@ void draw_line(u8 image_buffer[BUFFER_SIZE], Vector3 P0, Vector3 P1,
 
   if (fabsf(P1.x - P0.x) > fabsf(P1.y - P0.y)) {
     if (P0.x > P1.x) {
-      Vector3 tmp = P0;
-      P0 = P1;
-      P1 = tmp;
+      swap(&P0, &P1);
     }
     interpolate(buffer, P0.x, P0.y, P1.x, P1.y);
     for (int x = P0.x; x <= P1.x; x++) {
@@ -117,9 +139,7 @@ void draw_line(u8 image_buffer[BUFFER_SIZE], Vector3 P0, Vector3 P1,
     }
   } else {
     if (P0.y > P1.y) {
-      Vector3 tmp = P0;
-      P0 = P1;
-      P1 = tmp;
+      swap(&P0, &P1);
     }
     interpolate(buffer, P0.y, P0.x, P1.y, P1.x);
     for (int y = P0.y; y <= P1.y; y++) {
@@ -134,6 +154,22 @@ void draw_wireframe_triangle(u8 image_buffer[BUFFER_SIZE], Vector3 P0,
   draw_line(image_buffer, P0, P1, color);
   draw_line(image_buffer, P1, P2, color);
   draw_line(image_buffer, P2, P0, color);
+}
+
+void draw_filled_triangle(u8 image_buffer[BUFFER_SIZE], Vector3 P0, Vector3 P1,
+                          Vector3 P2, Vector3 color) {
+  if (P1.y < P0.y) {
+    swap(&P0, &P1);
+  }
+  if (P2.y < P0.y) {
+    swap(&P0, &P2);
+  }
+  if (P2.y < P1.y) {
+    swap(&P1, &P2);
+  }
+
+  float buffer[1000];
+  interpolate(buffer, P0.x, P0.y, P1.x, P1.y);
 }
 
 int main(void) {
@@ -151,10 +187,12 @@ int main(void) {
   Vector3 P2 = {20, 250, 0};
 
   Vector3 RED = {255, 0, 0};
+  Vector3 BLUE = {0, 255, 0};
+  Vector3 GREEN = {0, 0, 255};
   Vector3 BLACK = {0, 0, 0};
 
   draw_wireframe_triangle(image_buffer, P0, P1, P2, BLACK);
-  draw_line(image_buffer, P0, P1, RED);
+  // draw_line(image_buffer, P0, P1, RED);
 
   fprintf(file, "P3\n%i %i\n 255\n", IMAGE_WIDTH, IMAGE_HEIGHT);
   for (int i = 0; i < BUFFER_SIZE; i += 3) {
