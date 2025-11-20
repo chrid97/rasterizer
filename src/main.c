@@ -40,6 +40,8 @@ Arena *arena_alloc(u64 size) {
   return arena;
 }
 
+void *arena_push(Arena *arena, u64 size) { arena->current += size; }
+
 typedef struct {
   float x;
   float y;
@@ -112,13 +114,13 @@ void draw_pixel(u8 image_buffer[BUFFER_SIZE], float rx, float ry,
   image_buffer[index + 2] = color.z;
 }
 
-void interpolate(float buffer[1000], float i0, float d0, float i1, float d1) {
+void interpolate(Arena *arena, float i0, float d0, float i1, float d1) {
   float a = (d1 - d0) / (i1 - i0);
   float d = d0;
   int count = 0;
 
   for (int i = i0; i <= i1; i++) {
-    buffer[count++] = d;
+    // buffer[count++] = d;
     d += a;
   }
 }
@@ -168,8 +170,13 @@ void draw_filled_triangle(u8 image_buffer[BUFFER_SIZE], Vector3 P0, Vector3 P1,
     swap(&P1, &P2);
   }
 
-  float buffer[1000];
-  interpolate(buffer, P0.x, P0.y, P1.x, P1.y);
+  // TODO replace this buffer with an arena
+  float x01[1000];
+  interpolate(x01, P0.x, P0.y, P1.x, P1.y);
+  float x12[1000];
+  interpolate(x12, P1.y, P1.x, P2.y, P2.x);
+  float x02[1000];
+  interpolate(x02, P0.y, P0.x, P2.y, P2.x);
 }
 
 int main(void) {
