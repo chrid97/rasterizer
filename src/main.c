@@ -29,18 +29,28 @@ typedef uint64_t u64;
 
 typedef struct Arena Arena;
 struct Arena {
-  Arena *current;
+  u8 *base;
   u64 size;
+  u64 offset;
 };
 
 Arena *arena_alloc(u64 size) {
-  Arena *arena = malloc(size);
-  arena->current = arena;
+  Arena *arena = malloc(sizeof(Arena));
+  arena->base = malloc(size);
   arena->size = size;
+  arena->offset = 0;
+
   return arena;
 }
 
-void *arena_push(Arena *arena, u64 size) { arena->current += size; }
+void *arena_push(Arena *arena, u64 size) {
+  assert(arena->offset + size <= arena->size);
+  void *ptr = arena->base + arena->offset;
+  arena->offset += size;
+  return ptr;
+}
+
+void arena_free(Arena *a) { a->offset = 0; }
 
 typedef struct {
   float x;
@@ -114,52 +124,68 @@ void draw_pixel(u8 image_buffer[BUFFER_SIZE], float rx, float ry,
   image_buffer[index + 2] = color.z;
 }
 
-void interpolate(Arena *arena, float i0, float d0, float i1, float d1) {
+float *interpolate(Arena *arena, float i0, float d0, float i1, float d1) {
+  int start = (int)i0;
+  int end = (int)i1;
+  int count = end - start + 1;
+  assert(count > 0);
+
+  float *buffer = arena_push(arena, sizeof(float) * count);
+
   float a = (d1 - d0) / (i1 - i0);
   float d = d0;
-  int count = 0;
-
-  for (int i = i0; i <= i1; i++) {
-    // buffer[count++] = d;
+  for (int i = 0; i < count; i++) {
+    buffer[i] = d;
     d += a;
   }
+
+  return buffer;
 }
 
-void draw_line(u8 image_buffer[BUFFER_SIZE], Vector3 P0, Vector3 P1,
-               Vector3 color) {
-  float buffer[1000];
-  int buffer_count = 0;
-
+void draw_line(Arena *arena, u8 image_buffer[BUFFER_SIZE], Vector3 P0,
+               Vector3 P1, Vector3 color) {
   if (fabsf(P1.x - P0.x) > fabsf(P1.y - P0.y)) {
     if (P0.x > P1.x) {
       swap(&P0, &P1);
     }
-    interpolate(buffer, P0.x, P0.y, P1.x, P1.y);
-    for (int x = P0.x; x <= P1.x; x++) {
-      int y = x - P0.x;
-      draw_pixel(image_buffer, x, buffer[y], color);
+
+    int start_x = (int)P0.x;
+    int end_x = (int)P1.x;
+    int count = end_x - start_x + 1;
+
+    float *buffer = interpolate(arena, P0.x, P0.y, P1.x, P1.y);
+    for (int x = start_x; x <= end_x; x++) {
+      int index = x - start_x;
+      draw_pixel(image_buffer, x, buffer[index], color);
     }
   } else {
     if (P0.y > P1.y) {
       swap(&P0, &P1);
     }
-    interpolate(buffer, P0.y, P0.x, P1.y, P1.x);
-    for (int y = P0.y; y <= P1.y; y++) {
-      int x = y - P0.y;
-      draw_pixel(image_buffer, buffer[x], y, color);
+
+    int start_y = (int)P0.y;
+    int end_y = (int)P1.y;
+    int count = end_y - start_y + 1;
+
+    float *buffer = interpolate(arena, P0.y, P0.x, P1.y, P1.x);
+
+    for (int y = start_y; y <= end_y; ++y) {
+      int index = y - start_y;
+      draw_pixel(image_buffer, buffer[index], y, color);
     }
   }
 }
 
-void draw_wireframe_triangle(u8 image_buffer[BUFFER_SIZE], Vector3 P0,
-                             Vector3 P1, Vector3 P2, Vector3 color) {
-  draw_line(image_buffer, P0, P1, color);
-  draw_line(image_buffer, P1, P2, color);
-  draw_line(image_buffer, P2, P0, color);
+void draw_wireframe_triangle(Arena *arena, u8 image_buffer[BUFFER_SIZE],
+                             Vector3 P0, Vector3 P1, Vector3 P2,
+                             Vector3 color) {
+  draw_line(arena, image_buffer, P0, P1, color);
+  draw_line(arena, image_buffer, P1, P2, color);
+  draw_line(arena, image_buffer, P2, P0, color);
 }
 
-void draw_filled_triangle(u8 image_buffer[BUFFER_SIZE], Vector3 P0, Vector3 P1,
-                          Vector3 P2, Vector3 color) {
+void draw_filled_triangle(Arena *arena, u8 image_buffer[BUFFER_SIZE],
+                          Vector3 P0, Vector3 P1, Vector3 P2, Vector3 color) {
   if (P1.y < P0.y) {
     swap(&P0, &P1);
   }
@@ -170,13 +196,40 @@ void draw_filled_triangle(u8 image_buffer[BUFFER_SIZE], Vector3 P0, Vector3 P1,
     swap(&P1, &P2);
   }
 
-  // TODO replace this buffer with an arena
-  float x01[1000];
-  interpolate(x01, P0.x, P0.y, P1.x, P1.y);
-  float x12[1000];
-  interpolate(x12, P1.y, P1.x, P2.y, P2.x);
-  float x02[1000];
-  interpolate(x02, P0.y, P0.x, P2.y, P2.x);
+  float *x01 = interpolate(arena, P0.y, P0.x, P1.y, P1.x);
+  float *x12 = interpolate(arena, P1.y, P1.x, P2.y, P2.x);
+  float *x02 = interpolate(arena, P0.y, P0.x, P2.y, P2.x);
+
+  int x01_count = (int)P1.y - (int)P0.y + 1;
+  int x12_count = (int)P2.y - (int)P1.y + 1;
+  int x012_count = x01_count + x12_count;
+
+  float *x012 = arena_push(arena, sizeof(float) * x012_count);
+
+  for (int i = 0; i < x01_count; i++) {
+    x012[i] = x01[i];
+  }
+  for (int i = 0; i < x12_count; i++) {
+    x012[x01_count + i] = x12[i];
+  }
+
+  int m = x012_count / 2;
+  float *x_left = x02;
+  float *x_right = x012;
+
+  if (x02[m] > x012[m]) {
+    x_left = x012;
+    x_right = x02;
+  }
+
+  for (int y = (int)P0.y; y <= (int)P2.y; y++) {
+    int index = y - (int)P0.y;
+    for (int x = (int)x_left[index]; x <= (int)x_right[index]; x++) {
+      draw_pixel(image_buffer, x, y, color);
+    }
+  }
+
+  arena_free(arena);
 }
 
 int main(void) {
@@ -185,6 +238,8 @@ int main(void) {
     fprintf(stderr, "Failed to open file for writing.\n");
     return 1;
   }
+
+  Arena *scratch_arena = arena_alloc(Megabytes(4));
 
   u8 image_buffer[BUFFER_SIZE] = {0};
   memset(image_buffer, 255, BUFFER_SIZE);
@@ -198,7 +253,8 @@ int main(void) {
   Vector3 GREEN = {0, 0, 255};
   Vector3 BLACK = {0, 0, 0};
 
-  draw_wireframe_triangle(image_buffer, P0, P1, P2, BLACK);
+  draw_wireframe_triangle(scratch_arena, image_buffer, P0, P1, P2, RED);
+  draw_filled_triangle(scratch_arena, image_buffer, P0, P1, P2, RED);
   // draw_line(image_buffer, P0, P1, RED);
 
   fprintf(file, "P3\n%i %i\n 255\n", IMAGE_WIDTH, IMAGE_HEIGHT);
