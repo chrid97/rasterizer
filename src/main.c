@@ -232,6 +232,77 @@ void draw_filled_triangle(Arena *arena, u8 image_buffer[BUFFER_SIZE],
   arena_free(arena);
 }
 
+void draw_shaded_triangle(Arena *arena, u8 image_buffer[BUFFER_SIZE],
+                          Vector3 P0, Vector3 P1, Vector3 P2, Vector3 color,
+                          float h0, float h1, float h2) {
+  if (P1.y < P0.y) {
+    swap(&P0, &P1);
+  }
+  if (P2.y < P0.y) {
+    swap(&P0, &P2);
+  }
+  if (P2.y < P1.y) {
+    swap(&P1, &P2);
+  }
+
+  float *x01 = interpolate(arena, P0.y, P0.x, P1.y, P1.x);
+  float *h01 = interpolate(arena, P0.y, h0, P1.y, h1);
+
+  float *x12 = interpolate(arena, P1.y, P1.x, P2.y, P2.x);
+  float *h12 = interpolate(arena, P1.y, h1, P2.y, h2);
+
+  float *x02 = interpolate(arena, P0.y, P0.x, P2.y, P2.x);
+  float *h02 = interpolate(arena, P0.y, h0, P2.y, h2);
+
+  int x01_count = (int)P1.y - (int)P0.y + 1;
+  int x12_count = (int)P2.y - (int)P1.y + 1;
+  int x012_count = x01_count + x12_count;
+
+  float *x012 = arena_push(arena, sizeof(float) * x012_count);
+  for (int i = 0; i < x01_count; i++) {
+    x012[i] = x01[i];
+  }
+  for (int i = 0; i < x12_count; i++) {
+    x012[x01_count + i] = x12[i];
+  }
+
+  float *h012 = arena_push(arena, sizeof(float) * x012_count);
+  for (int i = 0; i < x01_count; i++) {
+    h012[i] = h01[i];
+  }
+  for (int i = 0; i < x12_count; i++) {
+    h012[x01_count + i] = h12[i];
+  }
+
+  int m = x01_count;
+  float *x_left = x02;
+  float *h_left = h02;
+  float *x_right = x012;
+  float *h_right = h012;
+
+  if (x02[m] > x012[m]) {
+    x_left = x012;
+    h_left = h012;
+    x_right = x02;
+    h_right = h02;
+  }
+
+  for (int y = (int)P0.y; y <= (int)P2.y; y++) {
+    int index = y - (int)P0.y;
+    float xl = (int)x_left[index];
+    float xr = (int)x_right[index];
+
+    float *h_segment =
+        interpolate(arena, xl, h_left[index], xr, h_right[index]);
+    for (int x = (int)x_left[index]; x <= (int)x_right[index]; x++) {
+      Vector3 shaded_color = Vector3Scale(color, h_segment[x - (int)xl]);
+      draw_pixel(image_buffer, x, y, shaded_color);
+    }
+  }
+
+  arena_free(arena);
+}
+
 int main(void) {
   FILE *file = fopen("image.ppm", "w");
   if (!file) {
@@ -249,12 +320,13 @@ int main(void) {
   Vector3 P2 = {20, 250, 0};
 
   Vector3 RED = {255, 0, 0};
-  Vector3 BLUE = {0, 255, 0};
-  Vector3 GREEN = {0, 0, 255};
+  Vector3 GREEN = {0, 255, 0};
+  Vector3 BLUE = {0, 0, 255};
   Vector3 BLACK = {0, 0, 0};
 
+  draw_shaded_triangle(scratch_arena, image_buffer, P0, P1, P2, GREEN, 1.0, 0.5,
+                       0.5);
   draw_wireframe_triangle(scratch_arena, image_buffer, P0, P1, P2, RED);
-  draw_filled_triangle(scratch_arena, image_buffer, P0, P1, P2, RED);
   // draw_line(image_buffer, P0, P1, RED);
 
   fprintf(file, "P3\n%i %i\n 255\n", IMAGE_WIDTH, IMAGE_HEIGHT);
