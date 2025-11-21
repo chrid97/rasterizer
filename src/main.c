@@ -12,6 +12,8 @@
 
 #define IMAGE_HEIGHT 1000
 #define IMAGE_WIDTH 1000
+#define VIEWPORT_HEIGHT 1
+#define VIEWPORT_WIDTH 1
 #define CHANNELS 3
 #define BUFFER_SIZE IMAGE_WIDTH * IMAGE_HEIGHT * CHANNELS
 
@@ -108,8 +110,8 @@ Vector3 Vector3Normalize(Vector3 v) {
 
 Vector3 Vector3Negate(Vector3 v) { return (Vector3){-v.x, -v.y, -v.z}; }
 
-void swap(Vector3 *a, Vector3 *b) {
-  Vector3 tmp = *a;
+void swap(Vector2 *a, Vector2 *b) {
+  Vector2 tmp = *a;
   *a = *b;
   *b = tmp;
 }
@@ -142,8 +144,8 @@ float *interpolate(Arena *arena, float i0, float d0, float i1, float d1) {
   return buffer;
 }
 
-void draw_line(Arena *arena, u8 image_buffer[BUFFER_SIZE], Vector3 P0,
-               Vector3 P1, Vector3 color) {
+void draw_line(Arena *arena, u8 image_buffer[BUFFER_SIZE], Vector2 P0,
+               Vector2 P1, Vector3 color) {
   if (fabsf(P1.x - P0.x) > fabsf(P1.y - P0.y)) {
     if (P0.x > P1.x) {
       swap(&P0, &P1);
@@ -177,7 +179,7 @@ void draw_line(Arena *arena, u8 image_buffer[BUFFER_SIZE], Vector3 P0,
 }
 
 void draw_wireframe_triangle(Arena *arena, u8 image_buffer[BUFFER_SIZE],
-                             Vector3 P0, Vector3 P1, Vector3 P2,
+                             Vector2 P0, Vector2 P1, Vector2 P2,
                              Vector3 color) {
   draw_line(arena, image_buffer, P0, P1, color);
   draw_line(arena, image_buffer, P1, P2, color);
@@ -185,7 +187,7 @@ void draw_wireframe_triangle(Arena *arena, u8 image_buffer[BUFFER_SIZE],
 }
 
 void draw_filled_triangle(Arena *arena, u8 image_buffer[BUFFER_SIZE],
-                          Vector3 P0, Vector3 P1, Vector3 P2, Vector3 color) {
+                          Vector2 P0, Vector2 P1, Vector2 P2, Vector3 color) {
   if (P1.y < P0.y) {
     swap(&P0, &P1);
   }
@@ -233,7 +235,7 @@ void draw_filled_triangle(Arena *arena, u8 image_buffer[BUFFER_SIZE],
 }
 
 void draw_shaded_triangle(Arena *arena, u8 image_buffer[BUFFER_SIZE],
-                          Vector3 P0, Vector3 P1, Vector3 P2, Vector3 color,
+                          Vector2 P0, Vector2 P1, Vector2 P2, Vector3 color,
                           float h0, float h1, float h2) {
   if (P1.y < P0.y) {
     swap(&P0, &P1);
@@ -303,6 +305,22 @@ void draw_shaded_triangle(Arena *arena, u8 image_buffer[BUFFER_SIZE],
   arena_free(arena);
 }
 
+Vector2 viewport_to_canvas(float x, float y) {
+  Vector2 result;
+  result.x = (x * IMAGE_WIDTH) / (float)VIEWPORT_WIDTH;
+  result.y = (y * IMAGE_HEIGHT) / (float)VIEWPORT_HEIGHT;
+  return result;
+}
+
+Vector2 project_vertex(Vector3 vertex) {
+  float d = 1.0f; // projection plane distance
+
+  float px = d * vertex.x / vertex.z;
+  float py = d * vertex.y / vertex.z;
+
+  return viewport_to_canvas(px, py);
+}
+
 int main(void) {
   FILE *file = fopen("image.ppm", "w");
   if (!file) {
@@ -315,19 +333,62 @@ int main(void) {
   u8 image_buffer[BUFFER_SIZE] = {0};
   memset(image_buffer, 255, BUFFER_SIZE);
 
-  Vector3 P0 = {-200, -250, 0};
-  Vector3 P1 = {200, 50, 0};
-  Vector3 P2 = {20, 250, 0};
+  Vector2 P0 = {-200, -250};
+  Vector2 P1 = {200, 50};
+  Vector2 P2 = {20, 250};
 
   Vector3 RED = {255, 0, 0};
   Vector3 GREEN = {0, 255, 0};
   Vector3 BLUE = {0, 0, 255};
   Vector3 BLACK = {0, 0, 0};
 
-  draw_shaded_triangle(scratch_arena, image_buffer, P0, P1, P2, GREEN, 1.0, 0.5,
-                       0.5);
-  draw_wireframe_triangle(scratch_arena, image_buffer, P0, P1, P2, RED);
-  // draw_line(image_buffer, P0, P1, RED);
+  // The four "front" vertices
+  Vector3 vAf = {-2, -0.5, 5};
+  Vector3 vBf = {-2, 0.5, 5};
+  Vector3 vCf = {-1, 0.5, 5};
+  Vector3 vDf = {-1, -0.5, 5};
+
+  // The four "back" vertices
+  Vector3 vAb = {-2, -0.5, 6};
+  Vector3 vBb = {-2, 0.5, 6};
+  Vector3 vCb = {-1, 0.5, 6};
+  Vector3 vDb = {-1, -0.5, 6};
+
+  // The front face
+  draw_line(scratch_arena, image_buffer, project_vertex(vAf),
+            project_vertex(vBf), BLUE);
+  draw_line(scratch_arena, image_buffer, project_vertex(vBf),
+            project_vertex(vCf), BLUE);
+  draw_line(scratch_arena, image_buffer, project_vertex(vCf),
+            project_vertex(vDf), BLUE);
+  draw_line(scratch_arena, image_buffer, project_vertex(vDf),
+            project_vertex(vAf), BLUE);
+
+  // The back face
+  draw_line(scratch_arena, image_buffer, project_vertex(vAb),
+            project_vertex(vBb), RED);
+
+  draw_line(scratch_arena, image_buffer, project_vertex(vBb),
+            project_vertex(vCb), RED);
+
+  draw_line(scratch_arena, image_buffer, project_vertex(vCb),
+            project_vertex(vDb), RED);
+
+  draw_line(scratch_arena, image_buffer, project_vertex(vDb),
+            project_vertex(vAb), RED);
+
+  // The front-to-back edges
+  draw_line(scratch_arena, image_buffer, project_vertex(vAf),
+            project_vertex(vAb), GREEN);
+
+  draw_line(scratch_arena, image_buffer, project_vertex(vBf),
+            project_vertex(vBb), GREEN);
+
+  draw_line(scratch_arena, image_buffer, project_vertex(vCf),
+            project_vertex(vCb), GREEN);
+
+  draw_line(scratch_arena, image_buffer, project_vertex(vDf),
+            project_vertex(vDb), GREEN);
 
   fprintf(file, "P3\n%i %i\n 255\n", IMAGE_WIDTH, IMAGE_HEIGHT);
   for (int i = 0; i < BUFFER_SIZE; i += 3) {
