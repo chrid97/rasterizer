@@ -120,6 +120,10 @@ void draw_pixel(u8 image_buffer[BUFFER_SIZE], float rx, float ry,
                 Vector3 color) {
   int x = (int)(IMAGE_WIDTH / 2) + rx;
   int y = (int)(IMAGE_HEIGHT / 2) - ry;
+  if (x < 0 || x >= IMAGE_WIDTH || y < 0 || y >= IMAGE_HEIGHT) {
+    return;
+  }
+
   int index = y * (IMAGE_WIDTH * CHANNELS) + (x * CHANNELS);
   image_buffer[index] = color.x;
   image_buffer[index + 1] = color.y;
@@ -333,62 +337,61 @@ int main(void) {
   u8 image_buffer[BUFFER_SIZE] = {0};
   memset(image_buffer, 255, BUFFER_SIZE);
 
-  Vector2 P0 = {-200, -250};
-  Vector2 P1 = {200, 50};
-  Vector2 P2 = {20, 250};
+  Vector3 red = {255, 0, 0};
+  Vector3 green = {0, 255, 0};
+  Vector3 blue = {0, 0, 255};
+  Vector3 yellow = {255, 255, 0};
+  Vector3 purple = {255, 0, 255};
+  Vector3 cyan = {0, 255, 255};
 
-  Vector3 RED = {255, 0, 0};
-  Vector3 GREEN = {0, 255, 0};
-  Vector3 BLUE = {0, 0, 255};
-  Vector3 BLACK = {0, 0, 0};
+  Vector3 vertices[8] = {
+      {1, 1, 1},    // 0
+      {-1, 1, 1},   // 1
+      {-1, -1, 1},  // 2
+      {1, -1, 1},   // 3
+      {1, 1, -1},   // 4
+      {-1, 1, -1},  // 5
+      {-1, -1, -1}, // 6
+      {1, -1, -1},  // 7
+  };
 
-  // The four "front" vertices
-  Vector3 vAf = {-2, -0.5, 5};
-  Vector3 vBf = {-2, 0.5, 5};
-  Vector3 vCf = {-1, 0.5, 5};
-  Vector3 vDf = {-1, -0.5, 5};
+  int triangles[12][3] = {
+      {0, 1, 2}, // red
+      {0, 2, 3}, // red
 
-  // The four "back" vertices
-  Vector3 vAb = {-2, -0.5, 6};
-  Vector3 vBb = {-2, 0.5, 6};
-  Vector3 vCb = {-1, 0.5, 6};
-  Vector3 vDb = {-1, -0.5, 6};
+      {4, 0, 3}, // green
+      {4, 3, 7}, // green
 
-  // The front face
-  draw_line(scratch_arena, image_buffer, project_vertex(vAf),
-            project_vertex(vBf), BLUE);
-  draw_line(scratch_arena, image_buffer, project_vertex(vBf),
-            project_vertex(vCf), BLUE);
-  draw_line(scratch_arena, image_buffer, project_vertex(vCf),
-            project_vertex(vDf), BLUE);
-  draw_line(scratch_arena, image_buffer, project_vertex(vDf),
-            project_vertex(vAf), BLUE);
+      {5, 4, 7}, // blue
+      {5, 7, 6}, // blue
 
-  // The back face
-  draw_line(scratch_arena, image_buffer, project_vertex(vAb),
-            project_vertex(vBb), RED);
+      {1, 5, 6}, // yellow
+      {1, 6, 2}, // yellow
 
-  draw_line(scratch_arena, image_buffer, project_vertex(vBb),
-            project_vertex(vCb), RED);
+      {4, 5, 1}, // purple
+      {4, 1, 0}, // purple
 
-  draw_line(scratch_arena, image_buffer, project_vertex(vCb),
-            project_vertex(vDb), RED);
+      {2, 6, 7}, // cyan
+      {2, 7, 3}, // cyan
+  };
 
-  draw_line(scratch_arena, image_buffer, project_vertex(vDb),
-            project_vertex(vAb), RED);
+  Vector3 tri_colors[12] = {red,    red,    green,  green,  blue, blue,
+                            yellow, yellow, purple, purple, cyan, cyan};
 
-  // The front-to-back edges
-  draw_line(scratch_arena, image_buffer, project_vertex(vAf),
-            project_vertex(vAb), GREEN);
+  Vector3 translation = {-1.5, 0, 7};
 
-  draw_line(scratch_arena, image_buffer, project_vertex(vBf),
-            project_vertex(vBb), GREEN);
+  for (int i = 0; i < 12; i++) {
+    int v0 = triangles[i][0];
+    int v1 = triangles[i][1];
+    int v2 = triangles[i][2];
 
-  draw_line(scratch_arena, image_buffer, project_vertex(vCf),
-            project_vertex(vCb), GREEN);
+    Vector2 p0 = project_vertex(Vector3Add(vertices[v0], translation));
+    Vector2 p1 = project_vertex(Vector3Add(vertices[v1], translation));
+    Vector2 p2 = project_vertex(Vector3Add(vertices[v2], translation));
 
-  draw_line(scratch_arena, image_buffer, project_vertex(vDf),
-            project_vertex(vDb), GREEN);
+    draw_wireframe_triangle(scratch_arena, image_buffer, p0, p1, p2,
+                            tri_colors[i]);
+  }
 
   fprintf(file, "P3\n%i %i\n 255\n", IMAGE_WIDTH, IMAGE_HEIGHT);
   for (int i = 0; i < BUFFER_SIZE; i += 3) {
