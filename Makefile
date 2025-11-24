@@ -1,2 +1,2 @@
-watch:
-	@bash ./run.sh
+tmux: 
+	@bash ./build.sh
