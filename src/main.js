@@ -1,39 +1,30 @@
-function frame() {
-  wasm.instance.exports.render();
-  ctx.putImageData(img, 0, 0);
-  requestAnimationFrame(frame);
-}
-
 async function main() {
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d");
   const width = canvas.width;
-  height = canvas.height;
+  const height = canvas.height;
 
+  const buffer_size_in_bytes = width * height * 4;
+  const bytes_per_page = 64 * 1024;
+  const initial_pages = Math.ceil(buffer_size_in_bytes / bytes_per_page);
+
+  // (TODO) Investigate how much memory I actually
+  // need so I can adjust page size later
   const memory = new WebAssembly.Memory({
-    initial: 10,
-    maximum: 100,
+    initial: 256,
+    maximum: 256,
   });
 
-  const bytes = await (await fetch("index.wasm")).arrayBuffer();
-  const module = await WebAssembly.compile(bytes);
-  console.log(WebAssembly.Module.imports(module));
+  const frameBufferPtr = 0;
+  const frameBuffer = new Uint8ClampedArray(memory.buffer, frameBufferPtr, buffer_size_in_bytes);
 
-  let result = await WebAssembly.instantiateStreaming(fetch("index.wasm"), {
-    env: {}
+  let wasm = await WebAssembly.instantiateStreaming(fetch("index.wasm"), {
+    env: { memory: memory }
   });
 
-  console.log(result);
-
-  //
-  // const memory = wasm.instance.exports.memory;
-  // const frameBufferPtr = 0;
-  //
-  // const frameBuffer = new Uint8ClampedArray(memory.buffer, frameBufferPtr, width * height * 4);
-  // wasm.instance.exports.set_framebuffer(framebufferPtr, width, height);
-  //
-  // const img = new ImageData(framebuffer, width, height);
-  // frame();
+  console.log("Exports:", Object.keys(wasm.instance.exports));
+  wasm.instance.exports.render(frameBufferPtr, buffer_size_in_bytes, width, height);
+  console.log(frameBuffer[1]);
 }
 
 main();
