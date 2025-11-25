@@ -13,6 +13,7 @@ emcc src/main.c \
   -nostdlib \
   -Wl,--no-entry \
   -Wl,--export=render \
+  -Wl,--export=get_heap_base \
   -o build/index.wasm
 
 cp ./src/main.js ./src/index.html ./build/
