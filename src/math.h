@@ -45,11 +45,11 @@ float Vector3DotProduct(Vector3 v1, Vector3 v2) {
   return (v1.x * v2.x) + (v1.y * v2.y) + (v1.z * v2.z);
 };
 
-float Vector3Length(Vector3 v1) { return sqrtf(Vector3DotProduct(v1, v1)); }
+// float Vector3Length(Vector3 v1) { return sqrtf(Vector3DotProduct(v1, v1)); }
 
-Vector3 Vector3Normalize(Vector3 v) {
-  float len = Vector3Length(v);
-  return (Vector3){v.x / len, v.y / len, v.z / len};
-}
+// Vector3 Vector3Normalize(Vector3 v) {
+//   float len = Vector3Length(v);
+//   return (Vector3){v.x / len, v.y / len, v.z / len};
+// }
 
 Vector3 Vector3Negate(Vector3 v) { return (Vector3){-v.x, -v.y, -v.z}; }

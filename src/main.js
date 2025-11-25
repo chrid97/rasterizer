@@ -1,6 +1,8 @@
 async function main() {
   const canvas = document.getElementById("canvas");
+  // TODO error if no canvas is found
   const ctx = canvas.getContext("2d");
+  // TODO error if can't create context
   const width = canvas.width;
   const height = canvas.height;
 
@@ -15,16 +17,23 @@ async function main() {
     maximum: 256,
   });
 
-  const frameBufferPtr = 0;
+  // WASM linear memory page 0 (0–64KB) is used by compiler/runtime: globals, stack, metadata.
+  // Start our framebuffer at page 1 (offset 64KB) to avoid overwriting internal state.
+  const frameBufferPtr = 1024 * 64;
   const frameBuffer = new Uint8ClampedArray(memory.buffer, frameBufferPtr, buffer_size_in_bytes);
 
   let wasm = await WebAssembly.instantiateStreaming(fetch("index.wasm"), {
-    env: { memory: memory }
+    env: {
+      memory: memory,
+    }
   });
 
-  console.log("Exports:", Object.keys(wasm.instance.exports));
   wasm.instance.exports.render(frameBufferPtr, buffer_size_in_bytes, width, height);
-  console.log(frameBuffer[1]);
+
+  const image = new ImageData(frameBuffer, width, height);
+  ctx.putImageData(image, 0, 0);
+
+  console.log("completeed")
 }
 
 main();
