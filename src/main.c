@@ -26,6 +26,8 @@ void draw_pixel(u8 *fb, int x, int y, int canvas_width, Vector3 color) {
   fb[index + 3] = 255;          // A
 }
 
+void draw_line(u8 *frame_buffer, int x0, int y0, int x1, int y1, int w) {}
+
 void render(u8 *frame_buffer, int frame_buffer_length, int canvas_width,
             int canvas_height) {
 
@@ -35,9 +37,14 @@ void render(u8 *frame_buffer, int frame_buffer_length, int canvas_width,
     draw_pixel(frame_buffer, x, y, canvas_width, BLACK);
   }
 
-  Vector2 p0 = {0, 10};
-  Vector2 p1 = {canvas_width - 1, 0};
-  for (int x = p0.x; x <= p1.x; x++) {
-    draw_pixel(frame_buffer, x, p0.y, canvas_width, RED);
-  }
+  Vector2 p0 = {0, 0};
+  Vector2 p1 = {500, 1000};
+  // draw_line(frame_buffer, p0.y, p0.x, p1.y, p1.x, canvas_width);
+  draw_line(frame_buffer, p0.x, p0.y, p1.x, p1.y, canvas_width);
+  // float a = (p1.y - p0.y) / (p1.x - p0.x);
+  // float y = p0.y;
+  // for (int x = p0.x; x <= p1.x; x++) {
+  //   draw_pixel(frame_buffer, x, y, canvas_width, RED);
+  //   y += a;
+  // }
 }
