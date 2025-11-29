@@ -55,7 +55,15 @@ float Vector3DotProduct(Vector3 v1, Vector3 v2) {
 Vector3 Vector3Negate(Vector3 v) { return (Vector3){-v.x, -v.y, -v.z}; }
 
 // Why does inling get rid of the ODR violation warning?
-inline int abs(int value) {
+static inline int abs(int value) {
+  if (value < 0) {
+    return -value;
+  }
+
+  return value;
+}
+
+static inline int absf(float value) {
   if (value < 0) {
     return -value;
   }
