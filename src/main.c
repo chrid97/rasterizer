@@ -56,9 +56,20 @@ void draw_triangle(u8 *fb, Vector2 p0, Vector2 p1, Vector2 p2) {
   draw_line(fb, p2.x, p2.y, p0.x, p0.y);
 }
 
-void render(u8 *frame_buffer, int frame_buffer_length, int browser_canvas_width,
-            int browser_canvas_height) {
+void draw_triangle_fill(u8 *fb, Vector2 p0, Vector2 p1, Vector2 p2) {
+  // for (int y = p2.y; y > p0.y; y--) {
+  //   draw_line(fb, p1.x, p1.y - y, p2.x, p2.y - y);
+  // }
+  // draw_line(fb, p1.x, p1.y - 1, p2.x, p2.y - 1);
+  // draw_line(fb, p1.x, p1.y - 2, p2.x, p2.y - 2);
+  // draw_line(fb, p1.x, p1.y - 3, p2.x, p2.y - 3);
+  // draw_line(fb, p1.x, p1.y, p2.x, p2.y);
+  // draw_line(fb, p2.x, p2.y, p0.x, p0.y);
+}
 
+void render(int frame_buffer_length, int browser_canvas_width,
+            int browser_canvas_height) {
+  u8 *frame_buffer = (u8 *)get_heap_base();
   canvas_width = browser_canvas_width;
   canvas_height = browser_canvas_height;
   js_log(canvas_width);
@@ -69,8 +80,14 @@ void render(u8 *frame_buffer, int frame_buffer_length, int browser_canvas_width,
     draw_pixel(frame_buffer, x, y, BLACK);
   }
 
+  Vector3 camera = {0, 0, 0};
+  Vector3 viewport = {1, 1, 1};
+
   Vector2 p0 = {100, 10};
   Vector2 p1 = {50, 200};
   Vector2 p2 = {150, 200};
   draw_triangle(frame_buffer, p0, p1, p2);
+  draw_triangle_fill(frame_buffer, p0, p1, p2);
+
+  // Prospective projections
 }

@@ -25,12 +25,10 @@ async function main() {
     }
   });
 
+  wasm.instance.exports.render(buffer_size_in_bytes, width, height);
+
   const heapBase = wasm.instance.exports.get_heap_base();
-  const frameBufferPtr = heapBase;
-  const frameBuffer = new Uint8ClampedArray(memory.buffer, frameBufferPtr, buffer_size_in_bytes);
-
-  wasm.instance.exports.render(frameBufferPtr, buffer_size_in_bytes, width, height);
-
+  const frameBuffer = new Uint8ClampedArray(memory.buffer, heapBase, buffer_size_in_bytes);
   const image = new ImageData(frameBuffer, width, height);
   ctx.putImageData(image, 0, 0);
 
