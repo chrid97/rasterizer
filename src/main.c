@@ -67,12 +67,25 @@ void draw_triangle_fill(u8 *fb, Vector2 p0, Vector2 p1, Vector2 p2) {
   // draw_line(fb, p2.x, p2.y, p0.x, p0.y);
 }
 
+Vector2 viewport_to_canvas(Vector2 point) {
+  Vector2 result;
+  result.x = (canvas_width * point.x) / 1;
+  result.y = (canvas_height * point.y) / 1;
+  return result;
+}
+
+Vector2 project_point(Vector3 point) {
+  Vector2 result;
+  result.x = (1.0f * point.x) / point.z;
+  result.y = (1.0f * point.y) / point.z;
+  return result;
+}
+
 void render(int frame_buffer_length, int browser_canvas_width,
             int browser_canvas_height) {
   u8 *frame_buffer = (u8 *)get_heap_base();
   canvas_width = browser_canvas_width;
   canvas_height = browser_canvas_height;
-  js_log(canvas_width);
 
   for (int i = 0; i < frame_buffer_length / 4; i++) {
     int x = i % canvas_width;
@@ -83,11 +96,10 @@ void render(int frame_buffer_length, int browser_canvas_width,
   Vector3 camera = {0, 0, 0};
   Vector3 viewport = {1, 1, 1};
 
-  Vector2 p0 = {100, 10};
-  Vector2 p1 = {50, 200};
-  Vector2 p2 = {150, 200};
+  Vector2 p0 = project_point((Vector3){100, 10, 10});
+  Vector2 p1 = project_point((Vector3){50, 200, 10});
+  Vector2 p2 = project_point((Vector3){150, 200, 10});
+
   draw_triangle(frame_buffer, p0, p1, p2);
   draw_triangle_fill(frame_buffer, p0, p1, p2);
-
-  // Prospective projections
 }
