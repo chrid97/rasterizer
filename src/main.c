@@ -82,7 +82,7 @@ Vector2 project_point(Vector3 point) {
   return result;
 }
 
-Matrix camera_look_at(Vector4 camera, Vector4 target) {
+Matrix look_at(Vector4 camera, Vector4 target) {
   Vector4 world_up = (Vector4){0, 1, 0, 0};
 
   Vector4 f = vec4_normalize(vec4_subtract(target, camera));
@@ -118,6 +118,8 @@ void render(int frame_buffer_length, int browser_canvas_width,
   u8 *frame_buffer = (u8 *)get_heap_base();
   canvas_width = browser_canvas_width;
   canvas_height = browser_canvas_height;
+  const float viewport_width = 2.0f;
+  const float viewport_height = 2.0f;
 
   for (int i = 0; i < frame_buffer_length / 4; i++) {
     int x = i % canvas_width;
@@ -128,13 +130,29 @@ void render(int frame_buffer_length, int browser_canvas_width,
   Vector4 camera = {0, 0, 1, 1};
   Vector4 target = {0, 0, 0, 1};
 
-  Matrix view = camera_look_at(camera, target);
+  Matrix view = look_at(camera, target);
+  Vector4 p0 = {0.1, -0.2, 0.2, 1};
+  Vector4 point = vec_mult_matrix(p0, view);
 
-  Vector4 p0 = {0.0f, 0.0f, 0.0f, 1.0f};
-  Vector4 pc = vec_mult_matrix(p0, view);
-  float px = pc.x / pc.z;
-  float py = pc.y / pc.z;
-  int sx = (int)((px * 0.5f + 0.5f) * canvas_width);
-  int sy = (int)((1 - (py * 0.5f + 0.5f)) * canvas_height);
-  draw_pixel(frame_buffer, sx, sy, RED);
+  Vector2 screen = {
+      point.x / -point.z,
+      point.y / -point.z,
+  };
+
+  if (fabsf(screen.x) > viewport_width * 0.5f ||
+      fabsf(screen.y) > viewport_height * 0.5f) {
+    return;
+  }
+
+  Vector2 ndc = {
+      (screen.x + viewport_width * 0.5f) / viewport_width,
+      (screen.y + viewport_height * 0.5f) / viewport_height,
+  };
+
+  int raster_x = floorf(ndc.x * canvas_width);
+  int raster_y = floorf((1 - ndc.y) * canvas_height);
+
+  js_log(raster_x);
+
+  draw_pixel(frame_buffer, raster_x, raster_y, RED);
 }
