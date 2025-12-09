@@ -1,5 +1,6 @@
-#include "math.h"
+#include "cg_math.h"
 #include "util.c"
+#include <math.h>
 
 #define COLOR_CHANNELS 4
 
@@ -34,7 +35,7 @@ void draw_line(u8 *frame_buffer, int x0, int y0, int x1, int y1) {
   float dx = x1 - x0;
   float dy = y1 - y0;
 
-  int steps = max(absf(dx), absf(dy));
+  int steps = max(fabsf(dx), fabsf(dy));
 
   if (steps != 0) {
     float x_step = dx / steps;
@@ -81,6 +82,37 @@ Vector2 project_point(Vector3 point) {
   return result;
 }
 
+Matrix camera_look_at(Vector4 camera, Vector4 target) {
+  Vector4 world_up = (Vector4){0, 1, 0, 0};
+
+  Vector4 f = vec4_normalize(vec4_subtract(target, camera));
+  Vector4 r = vec4_normalize(vec4_cross(world_up, f));
+  Vector4 u = vec4_cross(f, r);
+
+  Matrix m = {0};
+  m.d[0][0] = r.x;
+  m.d[0][1] = r.y;
+  m.d[0][2] = r.z;
+  m.d[0][3] = -vec4_dot(r, camera);
+
+  m.d[1][0] = u.x;
+  m.d[1][1] = u.y;
+  m.d[1][2] = u.z;
+  m.d[1][3] = -vec4_dot(u, camera);
+
+  m.d[2][0] = f.x;
+  m.d[2][1] = f.y;
+  m.d[2][2] = f.z;
+  m.d[2][3] = -vec4_dot(f, camera);
+
+  m.d[3][0] = 0.0f;
+  m.d[3][1] = 0.0f;
+  m.d[3][2] = 0.0f;
+  m.d[3][3] = 1.0f;
+
+  return m;
+}
+
 void render(int frame_buffer_length, int browser_canvas_width,
             int browser_canvas_height) {
   u8 *frame_buffer = (u8 *)get_heap_base();
@@ -93,13 +125,16 @@ void render(int frame_buffer_length, int browser_canvas_width,
     draw_pixel(frame_buffer, x, y, BLACK);
   }
 
-  Vector3 camera = {0, 0, 0};
-  Vector3 viewport = {1, 1, 1};
+  Vector4 camera = {0, 0, 1, 1};
+  Vector4 target = {0, 0, 0, 1};
 
-  Vector2 p0 = project_point((Vector3){100, 10, 10});
-  Vector2 p1 = project_point((Vector3){50, 200, 10});
-  Vector2 p2 = project_point((Vector3){150, 200, 10});
+  Matrix view = camera_look_at(camera, target);
 
-  draw_triangle(frame_buffer, p0, p1, p2);
-  draw_triangle_fill(frame_buffer, p0, p1, p2);
+  Vector4 p0 = {0.0f, 0.0f, 0.0f, 1.0f};
+  Vector4 pc = vec_mult_matrix(p0, view);
+  float px = pc.x / pc.z;
+  float py = pc.y / pc.z;
+  int sx = (int)((px * 0.5f + 0.5f) * canvas_width);
+  int sy = (int)((1 - (py * 0.5f + 0.5f)) * canvas_height);
+  draw_pixel(frame_buffer, sx, sy, RED);
 }
