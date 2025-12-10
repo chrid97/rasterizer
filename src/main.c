@@ -68,20 +68,6 @@ void draw_triangle_fill(u8 *fb, Vector2 p0, Vector2 p1, Vector2 p2) {
   // draw_line(fb, p2.x, p2.y, p0.x, p0.y);
 }
 
-Vector2 viewport_to_canvas(Vector2 point) {
-  Vector2 result;
-  result.x = (canvas_width * point.x) / 1;
-  result.y = (canvas_height * point.y) / 1;
-  return result;
-}
-
-Vector2 project_point(Vector3 point) {
-  Vector2 result;
-  result.x = (1.0f * point.x) / point.z;
-  result.y = (1.0f * point.y) / point.z;
-  return result;
-}
-
 Matrix look_at(Vector4 camera, Vector4 target) {
   Vector4 world_up = (Vector4){0, 1, 0, 0};
 
@@ -131,7 +117,7 @@ void render(int frame_buffer_length, int browser_canvas_width,
   Vector4 target = {0, 0, 0, 1};
 
   Matrix view = look_at(camera, target);
-  Vector4 p0 = {0.1, -0.2, 0.2, 1};
+  Vector4 p0 = {0.7, 0.0, 0.2, 1};
   Vector4 point = vec_mult_matrix(p0, view);
 
   Vector2 screen = {
@@ -151,8 +137,6 @@ void render(int frame_buffer_length, int browser_canvas_width,
 
   int raster_x = floorf(ndc.x * canvas_width);
   int raster_y = floorf((1 - ndc.y) * canvas_height);
-
-  js_log(raster_x);
 
   draw_pixel(frame_buffer, raster_x, raster_y, RED);
 }
