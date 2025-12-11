@@ -1,6 +1,7 @@
 #include "cg_math.h"
 #include "util.c"
 #include <math.h>
+#include <stdbool.h>
 
 #define COLOR_CHANNELS 4
 
@@ -17,9 +18,7 @@ static int canvas_height;
 
 extern void js_log(int x);
 
-__attribute__((used)) uint32_t get_heap_base() {
-  return (uint32_t)&__heap_base;
-}
+__attribute__((used)) u8 *get_heap_base() { return &__heap_base; }
 
 void draw_pixel(u8 *fb, int x, int y, Vector3 color) {
   int index = (y * canvas_width + x) * COLOR_CHANNELS;
@@ -31,7 +30,8 @@ void draw_pixel(u8 *fb, int x, int y, Vector3 color) {
 }
 
 // TODO Replace with Bresenham’s line algorithm
-void draw_line(u8 *frame_buffer, int x0, int y0, int x1, int y1) {
+void draw_line(u8 *frame_buffer, int x0, int y0, int x1, int y1,
+               Vector3 color) {
   float dx = x1 - x0;
   float dy = y1 - y0;
 
@@ -44,17 +44,17 @@ void draw_line(u8 *frame_buffer, int x0, int y0, int x1, int y1) {
     float x = x0;
     float y = y0;
     for (int i = 0; i <= steps; i++) {
-      draw_pixel(frame_buffer, (int)(x), (int)(y), RED);
+      draw_pixel(frame_buffer, (int)(x), (int)(y), color);
       x += x_step;
       y += y_step;
     }
   }
 }
 
-void draw_triangle(u8 *fb, Vector2 p0, Vector2 p1, Vector2 p2) {
-  draw_line(fb, p0.x, p0.y, p1.x, p1.y);
-  draw_line(fb, p1.x, p1.y, p2.x, p2.y);
-  draw_line(fb, p2.x, p2.y, p0.x, p0.y);
+void draw_triangle(u8 *fb, Vector2 p0, Vector2 p1, Vector2 p2, Vector3 color) {
+  draw_line(fb, p0.x, p0.y, p1.x, p1.y, color);
+  draw_line(fb, p1.x, p1.y, p2.x, p2.y, color);
+  draw_line(fb, p2.x, p2.y, p0.x, p0.y, color);
 }
 
 void draw_triangle_fill(u8 *fb, Vector2 p0, Vector2 p1, Vector2 p2) {
@@ -99,9 +99,35 @@ Matrix look_at(Vector4 camera, Vector4 target) {
   return m;
 }
 
+bool compute_pixel(Vector2 *out, Vector4 p0, Matrix view, float viewport_width,
+                   float viewport_height, int canvas_width, int canvas_height) {
+
+  Vector4 point = vec_mult_matrix(p0, view);
+
+  Vector2 screen = {
+      point.x / -point.z,
+      point.y / -point.z,
+  };
+
+  if (fabsf(screen.x) > viewport_width * 0.5f ||
+      fabsf(screen.y) > viewport_height * 0.5f) {
+    return false;
+  }
+
+  Vector2 ndc = {
+      (screen.x + viewport_width * 0.5f) / viewport_width,
+      (screen.y + viewport_height * 0.5f) / viewport_height,
+  };
+
+  *out = (Vector2){floorf(ndc.x * canvas_width),
+                   floorf((1 - ndc.y) * canvas_height)};
+
+  return true;
+}
+
 void render(int frame_buffer_length, int browser_canvas_width,
             int browser_canvas_height) {
-  u8 *frame_buffer = (u8 *)get_heap_base();
+  u8 *frame_buffer = get_heap_base();
   canvas_width = browser_canvas_width;
   canvas_height = browser_canvas_height;
   const float viewport_width = 2.0f;
@@ -115,28 +141,91 @@ void render(int frame_buffer_length, int browser_canvas_width,
 
   Vector4 camera = {0, 0, 1, 1};
   Vector4 target = {0, 0, 0, 1};
-
   Matrix view = look_at(camera, target);
-  Vector4 p0 = {0.7, 0.0, 0.2, 1};
-  Vector4 point = vec_mult_matrix(p0, view);
 
-  Vector2 screen = {
-      point.x / -point.z,
-      point.y / -point.z,
-  };
+  // FRONT face vertices
+  Vector4 vAf = {-2, -0.5, 5, 1};
+  Vector4 vBf = {-2, 0.5, 5, 1};
+  Vector4 vCf = {-1, 0.5, 5, 1};
+  Vector4 vDf = {-1, -0.5, 5, 1};
 
-  if (fabsf(screen.x) > viewport_width * 0.5f ||
-      fabsf(screen.y) > viewport_height * 0.5f) {
-    return;
-  }
+  // BACK face
+  Vector4 vAb = {-2, -0.5, 6, 1};
+  Vector4 vBb = {-2, 0.5, 6, 1};
+  Vector4 vCb = {-1, 0.5, 6, 1};
+  Vector4 vDb = {-1, -0.5, 6, 1};
 
-  Vector2 ndc = {
-      (screen.x + viewport_width * 0.5f) / viewport_width,
-      (screen.y + viewport_height * 0.5f) / viewport_height,
-  };
+  Vector2 A, B;
 
-  int raster_x = floorf(ndc.x * canvas_width);
-  int raster_y = floorf((1 - ndc.y) * canvas_height);
+  if (compute_pixel(&A, vAf, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height) &&
+      compute_pixel(&B, vBf, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height))
+    draw_line(frame_buffer, A.x, A.y, B.x, B.y, BLUE);
 
-  draw_pixel(frame_buffer, raster_x, raster_y, RED);
+  if (compute_pixel(&A, vBf, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height) &&
+      compute_pixel(&B, vCf, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height))
+    draw_line(frame_buffer, A.x, A.y, B.x, B.y, BLUE);
+
+  if (compute_pixel(&A, vCf, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height) &&
+      compute_pixel(&B, vDf, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height))
+    draw_line(frame_buffer, A.x, A.y, B.x, B.y, BLUE);
+
+  if (compute_pixel(&A, vDf, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height) &&
+      compute_pixel(&B, vAf, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height))
+    draw_line(frame_buffer, A.x, A.y, B.x, B.y, BLUE);
+  if (compute_pixel(&A, vAb, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height) &&
+      compute_pixel(&B, vBb, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height))
+    draw_line(frame_buffer, A.x, A.y, B.x, B.y, RED);
+
+  if (compute_pixel(&A, vBb, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height) &&
+      compute_pixel(&B, vCb, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height))
+    draw_line(frame_buffer, A.x, A.y, B.x, B.y, RED);
+
+  if (compute_pixel(&A, vCb, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height) &&
+      compute_pixel(&B, vDb, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height))
+    draw_line(frame_buffer, A.x, A.y, B.x, B.y, RED);
+
+  if (compute_pixel(&A, vDb, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height) &&
+      compute_pixel(&B, vAb, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height))
+    draw_line(frame_buffer, A.x, A.y, B.x, B.y, RED);
+
+  // -------- Connecting edges (GREEN) --------
+  if (compute_pixel(&A, vAf, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height) &&
+      compute_pixel(&B, vAb, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height))
+    draw_line(frame_buffer, A.x, A.y, B.x, B.y, GREEN);
+
+  if (compute_pixel(&A, vBf, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height) &&
+      compute_pixel(&B, vBb, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height))
+    draw_line(frame_buffer, A.x, A.y, B.x, B.y, GREEN);
+
+  if (compute_pixel(&A, vCf, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height) &&
+      compute_pixel(&B, vCb, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height))
+    draw_line(frame_buffer, A.x, A.y, B.x, B.y, GREEN);
+
+  if (compute_pixel(&A, vDf, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height) &&
+      compute_pixel(&B, vDb, view, viewport_width, viewport_height,
+                    canvas_width, canvas_height))
+    draw_line(frame_buffer, A.x, A.y, B.x, B.y, GREEN);
 }
