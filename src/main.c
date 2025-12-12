@@ -104,9 +104,10 @@ bool compute_pixel(Vector2 *out, Vector4 p0, Matrix view, float viewport_width,
 
   Vector4 point = vec_mult_matrix(p0, view);
 
+  float focal_length = 1.0f;
   Vector2 screen = {
-      point.x / -point.z,
-      point.y / -point.z,
+      (focal_length * point.x) / -point.z,
+      (focal_length * point.y) / -point.z,
   };
 
   if (fabsf(screen.x) > viewport_width * 0.5f ||
